@@ -21,9 +21,11 @@ namespace Ozon.Examination.Service.Controllers
         }
 
         [HttpGet("{year:int}/{month:int}")]
-        public async Task<IActionResult> Get([FromRoute] RetesReportRequest request)
-        {
-            return Ok(await this.exchangeService.GetRatesReportAsync(request.Year, request.Month, this.options.Currencies));
-        }
+        public async Task<IActionResult> GetByMonth([FromRoute] RetesReportRequest request) =>
+            Ok(await this.exchangeService.GetRatesReportAsync(request.Year, request.Month, this.options.Currencies));
+
+        [HttpGet("{year:int}")]
+        public async Task<IActionResult> GetByYear([FromRoute] int year) =>
+            Ok(await this.exchangeService.GetRatesReportAsync(year, this.options.Currencies));
     }
 }

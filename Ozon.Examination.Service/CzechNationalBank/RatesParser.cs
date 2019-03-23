@@ -63,32 +63,35 @@ namespace Ozon.Examination.Service.CzechNationalBank
 
             var rates = new List<Rate>();
 
-            var headers = (await streamReader.ReadLineAsync())
-                .Split(FieldSeparator)
-                .Skip(1)
-                .Select(s =>
-                {
-                    var match = YearHeaderRegex.Match(s);
-                    return new
-                    {
-                        amount = int.Parse(match.Groups[1].Value, CultureInfo),
-                        currency = match.Groups[2].Value,
-                    };
-                }).ToArray();
-
-            while (!streamReader.EndOfStream)
+            if(!streamReader.EndOfStream)
             {
-                var row = (await streamReader.ReadLineAsync()).Split(FieldSeparator);
-                var date = DateTime.ParseExact(row.First(), DateFormat, CultureInfo);
-                rates.AddRange(row
+                var headers = (await streamReader.ReadLineAsync())
+                    .Split(FieldSeparator)
                     .Skip(1)
-                    .Select((rate, i) => new Rate
+                    .Select(s =>
                     {
-                        Date = date,
-                        Currency = headers[i].currency,
-                        Amount = headers[i].amount,
-                        Value = decimal.Parse(rate, CultureInfo),
-                    }));
+                        var match = YearHeaderRegex.Match(s);
+                        return new
+                        {
+                            amount = int.Parse(match.Groups[1].Value, CultureInfo),
+                            currency = match.Groups[2].Value,
+                        };
+                    }).ToArray();
+
+                while (!streamReader.EndOfStream)
+                {
+                    var row = (await streamReader.ReadLineAsync()).Split(FieldSeparator);
+                    var date = DateTime.ParseExact(row.First(), DateFormat, CultureInfo);
+                    rates.AddRange(row
+                        .Skip(1)
+                        .Select((rate, i) => new Rate
+                        {
+                            Date = date,
+                            Currency = headers[i].currency,
+                            Amount = headers[i].amount,
+                            Value = decimal.Parse(rate, CultureInfo),
+                        }));
+                }
             }
 
             return await Task.FromResult(rates);

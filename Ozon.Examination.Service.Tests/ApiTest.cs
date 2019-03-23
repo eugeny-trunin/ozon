@@ -17,11 +17,11 @@ namespace Ozon.Examination.Service.Tests
     public class ApiTest
     {
         [Test]
-        public void ExchangeGet_LoadedRates_RatesStatistics()
+        public void ExchangeGetMonth_LoadedRates_RatesStatistics()
         {
             var mockDataService = new Mock<IDataService>(MockBehavior.Strict);
             mockDataService
-                .Setup(m => m.GetRateStatisticsAsync(It.IsAny<int>(), It.IsAny<byte>(), It.IsAny<IEnumerable<string>>()))
+                .Setup(m => m.GetRateStatisticsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IEnumerable<string>>()))
                 .ReturnsAsync(new[] { new Persistence.Entities.RateStatistics
                 {
                     Currency = "USD",
@@ -57,29 +57,40 @@ namespace Ozon.Examination.Service.Tests
                 Assert.AreEqual(22.494m, result.WeekStatistics.First().Rates.First().Min);
                 Assert.AreEqual(22.594m, result.WeekStatistics.First().Rates.First().Median);
                 mockDataService.Verify(m => m.GetRateStatisticsAsync(
-                    It.IsIn(2019),
-                    It.IsIn<byte>(1),
+                    It.IsIn(new DateTime(2019, 1, 1)),
+                    It.IsIn(new DateTime(2019, 1, 31)),
                     It.Is<IEnumerable<string>>(arg => arg.Single() == "USD")),
                     Times.Once());
             });
         }
 
         [Test]
-        public void ExchangeGet_NotLoadedRates_RatesStatisticsText()
+        public void ExchangeGetYear_NotLoadedRates_RatesStatisticsText()
         {
             var mockDataService = new Mock<IDataService>(MockBehavior.Strict);
             mockDataService
-                .SetupSequence(m => m.GetRateStatisticsAsync(It.IsAny<int>(), It.IsAny<byte>(), It.IsAny<IEnumerable<string>>()))
+                .SetupSequence(m => m.GetRateStatisticsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IEnumerable<string>>()))
                 .ReturnsAsync(Enumerable.Empty<Persistence.Entities.RateStatistics>())
-                .ReturnsAsync(new[] { new Persistence.Entities.RateStatistics
-                {
-                    Currency = "IDR",
-                    From = new DateTime(2018, 1, 2),
-                    To = new DateTime(2018, 1, 4),
-                    Max = 0.001576m,
-                    Min = 0.001564m,
-                    Median = 0.001571m,
-                }});
+                .ReturnsAsync(new[] {
+                    new Persistence.Entities.RateStatistics
+                    {
+                        Currency = "IDR",
+                        From = new DateTime(2019, 1, 2),
+                        To = new DateTime(2019, 1, 4),
+                        Max = 0.001576m,
+                        Min = 0.001564m,
+                        Median = 0.001571m,
+                    },
+                    new Persistence.Entities.RateStatistics
+                    {
+                        Currency = "IDR",
+                        From = new DateTime(2019, 2, 1),
+                        To = new DateTime(2019, 2, 1),
+                        Max = 0.001607m,
+                        Min = 0.001607m,
+                        Median = 0.001607m,
+                    },
+                });
             mockDataService
                 .Setup(m => m.SaveRatesAsync(It.IsAny<IEnumerable<Persistence.Entities.Rate>>()))
                 .Returns(Task.CompletedTask);
@@ -87,13 +98,15 @@ namespace Ozon.Examination.Service.Tests
             var mockRateClient = new Mock<CzechNationalBank.IRateClient>(MockBehavior.Strict);
             mockRateClient
                 .Setup(m => m.GetYearRatesAsync(It.IsAny<int>()))
-                .ReturnsAsync(new[] { new CzechNationalBank.Rate
-                {
-                    Date = new DateTime(2018, 1, 1),
-                    Currency = "IDR",
-                    Amount = 1000,
-                    Value = 1.578m,
-                }});
+                .ReturnsAsync(new[] {
+                    new CzechNationalBank.Rate
+                    {
+                        Date = new DateTime(2019, 1, 1),
+                        Currency = "IDR",
+                        Amount = 1000,
+                        Value = 1.578m,
+                    },
+                });
 
             var client = new WebApplicationFactory<Startup>()
                 .WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
@@ -104,7 +117,7 @@ namespace Ozon.Examination.Service.Tests
                 }))
                 .CreateClient();
 
-            var request = new HttpRequestMessage(HttpMethod.Get, "api/exchange/2018/1");
+            var request = new HttpRequestMessage(HttpMethod.Get, "api/exchange/2019");
             request.Headers.Add("Accept", "text/plain");
             var response = client.SendAsync(request).Result;
 
@@ -112,10 +125,14 @@ namespace Ozon.Examination.Service.Tests
             {
                 Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
                 var result = response.Content.ReadAsStringAsync().Result;
-                Assert.AreEqual("Year: 2018, month: January\n\nWeek periods:\n\n2...4: IDR - max:0.001576, min:0.001564, median:0.001571;", result);
+                Assert.AreEqual(
+                    "Year: 2019, month: January\n\nWeek periods:\n\n2...4: IDR - max:0.001576, min:0.001564, median:0.001571;"+
+                    "\n\n"+
+                    "Year: 2019, month: February\n\nWeek periods:\n\n1...1: IDR - max:0.001607, min:0.001607, median:0.001607;",
+                    result);
                 mockDataService.Verify(m => m.SaveRatesAsync(
                     It.Is<IEnumerable<Persistence.Entities.Rate>>(arg =>
-                        arg.Any(r => r.Date == new DateTime(2018, 1, 1) && r.Currency == "IDR" && r.Value == 0.001578m))),
+                        arg.Any(r => r.Date == new DateTime(2019, 1, 1) && r.Currency == "IDR" && r.Value == 0.001578m))),
                     Times.Once());
             });
         }

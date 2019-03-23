@@ -25,20 +25,45 @@ namespace Ozon.Examination.Service.Services
             if (currencies == null)
                 throw new ArgumentNullException(nameof(currencies));
 
-            var rateStatistics = await this.dataService.GetRateStatisticsAsync(year, month, currencies);
+            return (await GetRatesReportAsync(
+                new DateTime(year, month, 1),
+                new DateTime(year, month, 1).AddMonths(1).AddDays(-1),
+                currencies)).SingleOrDefault();
+        }
+
+        /// <inheritdoc />
+        public async Task<IEnumerable<RatesReport>> GetRatesReportAsync(int year, IEnumerable<string> currencies)
+        {
+            if (currencies == null)
+                throw new ArgumentNullException(nameof(currencies));
+
+            return (await GetRatesReportAsync(
+                new DateTime(year, 1, 1),
+                new DateTime(year, 12, 31),
+                currencies)).ToArray();
+        }
+
+        private async Task<IEnumerable<RatesReport>> GetRatesReportAsync(DateTime from, DateTime to, IEnumerable<string> currencies)
+        {
+            var rateStatistics = await this.dataService.GetRateStatisticsAsync(from, to, currencies);
             if (!rateStatistics.Any())
             {
-                var rates = await this.rateClient.GetYearRatesAsync(year);
-                await this.dataService.SaveRatesAsync(rates.Select(r => ConvertRate(r)));
+                foreach(var year in Enumerable.Range(from.Year, from.Year-to.Year+1))
+                {
+                    var rates = await this.rateClient.GetYearRatesAsync(year);
+                    await this.dataService.SaveRatesAsync(rates.Select(r => ConvertRate(r)));
+                }
 
-                rateStatistics = await this.dataService.GetRateStatisticsAsync(year, month, currencies);
+                rateStatistics = await this.dataService.GetRateStatisticsAsync(from, to, currencies);
             }
 
-            return new RatesReport
-            {
-                Year = year,
-                Month = month,
-                WeekStatistics = rateStatistics
+            return rateStatistics
+                .GroupBy(rs => new { year = rs.From.Year, month = rs.From.Month })
+                .Select(gm => new RatesReport
+                {
+                    Year = gm.Key.year,
+                    Month = (byte)gm.Key.month,
+                    WeekStatistics = gm
                     .GroupBy(r => new { from = r.From, to = r.To })
                     .Select(g => new WeekStatistics
                     {
@@ -54,7 +79,8 @@ namespace Ozon.Examination.Service.Services
                     })
                     .OrderBy(r => r.From)
                     .ToArray()
-            };
+                })
+                .OrderBy(rr => rr.Year * 12 + rr.Month);
         }
 
         /// <inheritdoc />

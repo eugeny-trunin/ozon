@@ -48,7 +48,7 @@ namespace Ozon.Examination.Service
                 .AddMvc(options =>
                 {
                     options.RespectBrowserAcceptHeader = true;
-                    options.OutputFormatters.Add(new ToStringOutputFormatter());
+                    options.OutputFormatters.Add(new TextReportOutputFormatter());
                 })
                 .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
         }

@@ -26,10 +26,13 @@ namespace Ozon.Examination.Service.Middleware
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            // calculate through how much time you need to start synchronization process
             var dueTime = this.options.Time.UtcDateTime.TimeOfDay - this.systemClock.UtcNow.TimeOfDay;
+            // if negative value, synchronization process will be started next day
             if (dueTime.TotalMilliseconds < 0)
                 dueTime += TimeSpan.FromDays(1);
 
+            // start timer through the calculated period with repetition every day
             this.timer = new Timer(DoWork, null, dueTime, TimeSpan.FromDays(1));
             return Task.CompletedTask;
         }
@@ -44,6 +47,7 @@ namespace Ozon.Examination.Service.Middleware
         {
             using (var scope = this.serviceScopeFactory.CreateScope())
             {
+                // calculating date of start in the context of an time zone from start time parameter
                 var date = this.systemClock.UtcNow + this.options.Time.Offset;
 
                 var exchangeService = scope.ServiceProvider.GetRequiredService<IExchangeService>();

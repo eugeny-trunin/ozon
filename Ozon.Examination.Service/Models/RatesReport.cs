@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Ozon.Examination.Service.Filters;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
 namespace Ozon.Examination.Service.Models
 {
-    public class RatesReport
+    public class RatesReport : ITextReport
     {
         /// <summary>
         /// Get or sets year of report
@@ -22,7 +23,7 @@ namespace Ozon.Examination.Service.Models
         /// </summary>
         public IEnumerable<WeekStatistics> WeekStatistics { get; set; }
 
-        public override string ToString()
+        public string GetReport()
         {
             return
                 FormattableString.Invariant($"Year: {Year}, month: {new DateTimeFormatInfo().GetMonthName(Month)}\n\n")
